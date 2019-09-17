@@ -1,43 +1,45 @@
 package main
 
+import (
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
 /*
 это тест на проверку того что у нас это действительно конвейер
 неправильное поведение: накапливать результаты выполнения одной функции, а потом слать их в следующую.
 	это не похволяет запускать на конвейере бесконечные задачи
 правильное поведение: обеспечить беспрепятственный поток
 */
-//func TestPipeline(t *testing.T) {
-//
-//	var ok = true
-//	var recieved uint32
-//	freeFlowJobs := []job{
-//		job(func(in, out chan interface{}) {
-//			fmt.Println("HERE1")
-//			out <- 1
-//			time.Sleep(10 * time.Millisecond)
-//			fmt.Println("HERE1.1")
-//			currRecieved := atomic.LoadUint32(&recieved)
-//			// в чем тут суть
-//			// если вы накапливаете значения, то пока вся функция не отрабоатет - дальше они не пойдут
-//			// тут я проверяю, что счетчик увеличился в следующей функции
-//			// это значит что туда дошло значение прежде чем текущая функция отработала
-//			if currRecieved == 0 {
-//				ok = false
-//			}
-//		}),
-//		job(func(in, out chan interface{}) {
-//			fmt.Println("HERE2")
-//			for _ = range in {
-//				fmt.Println("HERE2.2")
-//				atomic.AddUint32(&recieved, 1)
-//			}
-//		}),
-//	}
-//	ExecutePipeline(freeFlowJobs...)
-//	if !ok || recieved == 0 {
-//		t.Errorf("no value free flow - dont collect them")
-//	}
-//}
+func TestPipeline(t *testing.T) {
+
+	var ok = true
+	var recieved uint32
+	freeFlowJobs := []job{
+		job(func(in, out chan interface{}) {
+			out <- 1
+			time.Sleep(10 * time.Millisecond)
+			currRecieved := atomic.LoadUint32(&recieved)
+			// в чем тут суть
+			// если вы накапливаете значения, то пока вся функция не отрабоатет - дальше они не пойдут
+			// тут я проверяю, что счетчик увеличился в следующей функции
+			// это значит что туда дошло значение прежде чем текущая функция отработала
+			if currRecieved == 0 {
+				ok = false
+			}
+		}),
+		job(func(in, out chan interface{}) {
+			for _ = range in {
+				atomic.AddUint32(&recieved, 1)
+			}
+		}),
+	}
+	ExecutePipeline(freeFlowJobs...)
+	if !ok || recieved == 0 {
+		t.Errorf("no value free flow - dont collect them")
+	}
+}
 
 //func TestSigner(t *testing.T) {
 //
