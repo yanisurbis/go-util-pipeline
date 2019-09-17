@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -12,7 +11,6 @@ func ExecutePipeline(jobs ...job) {
 	l := len(jobs)
 
 	chans := make([]chan interface{}, l)
-	fmt.Println(l, "channels created")
 
 	for i := 0; i < l; i++ {
 		chans[i] = make(chan interface{}, 1)
@@ -23,7 +21,6 @@ func ExecutePipeline(jobs ...job) {
 		go func(in, out chan interface{}, job job) {
 			defer wg.Done()
 			job(in, out)
-			fmt.Println("done", i)
 			close(out)
 		}(chans[i], chans[(i+1)%l], j)
 	}
