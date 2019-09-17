@@ -46,17 +46,17 @@ func TestByIlia(t *testing.T) {
 		}),
 	}
 
-	//start := time.Now()
+	start := time.Now()
 
 	ExecutePipeline(freeFlowJobs...)
 
-	//end := time.Since(start)
-	//
-	//expectedTime := time.Millisecond * 350
-	//
-	//if end > expectedTime {
-	//	t.Errorf("execition too long\nGot: %s\nExpected: <%s", end, expectedTime)
-	//}
+	end := time.Since(start)
+
+	expectedTime := time.Millisecond * 350
+
+	if end > expectedTime {
+		t.Errorf("execition too long\nGot: %s\nExpected: <%s", end, expectedTime)
+	}
 
 	if recieved != (1+3+4)*3 {
 		t.Errorf("f3 have not collected inputs, recieved = %d", recieved)
