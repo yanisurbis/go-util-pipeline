@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 	"sort"
+	"sync"
+	"strings"
 )
 
 type job func(in, out chan interface{})
@@ -61,38 +63,68 @@ var DataSignerCrc32 = func(data string) string {
 }
 
 func SingleHash(in, out chan interface{}) {
-	data := (<-in).(int)
-	out <- DataSignerCrc32(strconv.Itoa(data)) + "~" + DataSignerCrc32(strconv.Itoa(data))
+	for data := range in {
+		data1 := (data).(int)
+		dataS := strconv.Itoa(data1)
+
+		crc32_ := make(chan string)
+		crc32md5_ := make(chan string)
+
+		go func() {
+			crc32_ <- DataSignerCrc32(dataS)
+		}()
+
+		go func() {
+			crc32md5_ <- DataSignerCrc32(DataSignerMd5(dataS))
+		}()
+
+		res := <-crc32_ + "~" + <-crc32md5_
+		//fmt.Println(res)
+		out <- res
+	}
 }
 
 func MultiHash(in, out chan interface{}) {
-	data := <-in
-	data1 := data.(string)
+	for data := range in {
+		mu := &sync.Mutex{}
+		wg := &sync.WaitGroup{}
 
-	var res string
+		data1 := data.(string)
 
-	for i := 0; i < 6; i++ {
-		res += DataSignerCrc32(strconv.Itoa(i) + data1)
+		var res string
+		var resStrings [6]string
+
+		for i := 0; i < 6; i++ {
+			wg.Add(1)
+			go func(data string, i int, mu *sync.Mutex, resStrings *[6]string) {
+				defer wg.Done()
+				res := DataSignerCrc32(strconv.Itoa(i) + data1)
+				mu.Lock()
+				resStrings[i] = res
+				mu.Unlock()
+			}(data1, i, mu, &resStrings)
+		}
+
+		wg.Wait()
+
+		mu.Lock()
+		for _, s := range resStrings {
+			res += s
+		}
+		mu.Unlock()
+
+		out <- res
 	}
-
-	out <- res
 }
 
 func CombineResults(in, out chan interface{}) {
-	data := make([]string, 0, 6)
+	var data []string
 
 	for d := range in {
-		d1 := d.(string)
-		data = append(data, d1)
+		data = append(data, d.(string))
 	}
 
 	sort.Strings(data)
 
-	res := data[0]
-
-	for _, s := range data {
-		res += "_" + s
-	}
-
-	out <- res
+	out <- strings.Join(data, "_")
 }
