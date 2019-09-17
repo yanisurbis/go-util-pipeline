@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -37,12 +38,12 @@ func TestByIlia(t *testing.T) {
 				time.Sleep(time.Millisecond * 100)
 			}
 		}),
-		//job(func(in, out chan interface{}) {
-		//	for val := range in {
-		//		fmt.Println("collected", val)
-		//		atomic.AddUint32(&recieved, val.(uint32))
-		//	}
-		//}),
+		job(func(in, out chan interface{}) {
+			for val := range in {
+				fmt.Println("collected", val)
+				atomic.AddUint32(&recieved, val.(uint32))
+			}
+		}),
 	}
 
 	//start := time.Now()
