@@ -61,9 +61,8 @@ var DataSignerCrc32 = func(data string) string {
 }
 
 func SingleHash(in, out chan interface{}) {
-	data := <-in
-	data1 := data.(string)
-	out <- DataSignerCrc32(data1) + "~" + DataSignerCrc32(data1)
+	data := (<-in).(int)
+	out <- DataSignerCrc32(strconv.Itoa(data)) + "~" + DataSignerCrc32(strconv.Itoa(data))
 }
 
 func MultiHash(in, out chan interface{}) {
@@ -82,8 +81,7 @@ func MultiHash(in, out chan interface{}) {
 func CombineResults(in, out chan interface{}) {
 	data := make([]string, 0, 6)
 
-	for i := 0; i < 6; i++ {
-		d := <-in
+	for d := range in {
 		d1 := d.(string)
 		data = append(data, d1)
 	}
