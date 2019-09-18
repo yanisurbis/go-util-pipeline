@@ -1,6 +1,7 @@
 package main
 
 import (
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -8,28 +9,42 @@ import (
 )
 
 func SingleHash(in, out chan interface{}) {
+	wg := &sync.WaitGroup{}
+	quotaCh := make(chan struct{}, 1)
+
 	for data := range in {
+		wg.Add(1)
 		data1 := (data).(int)
 		dataS := strconv.Itoa(data1)
 
 		crc32_ := make(chan string)
 		crc32md5_ := make(chan string)
 
-		go func() {
+		go func(dataS string) {
 			crc32_ <- DataSignerCrc32(dataS)
-		}()
+		}(dataS)
+
+		go func(dataS string, quotaCh chan struct{}) {
+			quotaCh <- struct{}{}
+			md5_ := DataSignerMd5(dataS)
+			<-quotaCh
+			runtime.Gosched()
+			crc32md5_ <- DataSignerCrc32(md5_)
+		}(dataS, quotaCh)
 
 		go func() {
-			crc32md5_ <- DataSignerCrc32(DataSignerMd5(dataS))
+			defer wg.Done()
+			res := <-crc32_ + "~" + <-crc32md5_
+			out <- res
 		}()
-
-		res := <-crc32_ + "~" + <-crc32md5_
-		out <- res
 	}
+	wg.Wait()
 }
 
 func MultiHash(in, out chan interface{}) {
+	wg_ := &sync.WaitGroup{}
 	for data := range in {
+		wg_.Add(1)
 		mu := &sync.Mutex{}
 		wg := &sync.WaitGroup{}
 
@@ -49,16 +64,20 @@ func MultiHash(in, out chan interface{}) {
 			}(data1, i, mu, &resStrings)
 		}
 
-		wg.Wait()
+		go func() {
+			defer wg_.Done()
+			wg.Wait()
 
-		mu.Lock()
-		for _, s := range resStrings {
-			res += s
-		}
-		mu.Unlock()
+			mu.Lock()
+			for _, s := range resStrings {
+				res += s
+			}
+			mu.Unlock()
 
-		out <- res
+			out <- res
+		}()
 	}
+	wg_.Wait()
 }
 
 func CombineResults(in, out chan interface{}) {
@@ -69,7 +88,6 @@ func CombineResults(in, out chan interface{}) {
 	}
 
 	sort.Strings(data)
-
 	out <- strings.Join(data, "_")
 }
 
